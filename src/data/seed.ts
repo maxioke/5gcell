@@ -94,10 +94,10 @@ export function getSeedData(): WorkshopData {
     clients: structuredClone(clients),
     orders: structuredClone(orders),
     settings: {
-      workshopName: '5G CELL COMUNICACIONES Reparaciones',
-      workshopShortName: '5G CELL COMUNICACIONES',
-      phone: '+57 300 555 0124',
-      address: 'Calle 10 # 43A-26, Medellín',
+      workshopName: '5G CELL COMUNICACIONES',
+      workshopShortName: '5G CELL',
+      phone: '3502636682',
+      address: 'Calle 14 #5-18 (Local 2047)',
       nextOrderSequence: 9,
     },
   }

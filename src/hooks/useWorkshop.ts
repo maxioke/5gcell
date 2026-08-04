@@ -4,16 +4,16 @@ import { id, normalizeDocument } from '../lib/formatters'
 import type { Client, NewClientInput, NewOrderInput, PaymentMethod, RepairOrder, RepairStatus, WorkshopData } from '../types'
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
-const STORAGE_KEY = 'microlab-workshop-data-v1'
+const STORAGE_KEY = '5gcell-workshop-data-v1'
 
 function loadData(): WorkshopData {
-  try {
-    const saved = window.localStorage.getItem(STORAGE_KEY)
-    if (saved) return JSON.parse(saved) as WorkshopData
-  } catch {
-    // A fresh, valid demo is safer than leaving the interface unusable after corrupt local data.
-  }
-  return getSeedData()
+  return {
+    clients: [],
+    orders: [],
+    settings: {
+      nextOrderSequence: 1,
+    },
+  } as WorkshopData
 }
 
 function now() {
@@ -45,6 +45,15 @@ export function useWorkshop() {
           .eq("user_id", user.id);
   
         if (ordersError) throw ordersError;
+        const { data: settings, error: settingsError } = await supabase
+  .from("settings")
+  .select("*")
+  .eq("user_id", user.id)
+  .single();
+
+if (settingsError && settingsError.code !== "PGRST116") {
+  throw settingsError;
+}
         console.log("CLIENTES CARGADOS:", clients);
   
         setData((current) => ({
@@ -80,6 +89,15 @@ export function useWorkshop() {
             notes: order.notes ?? [],
             movements: order.movements ?? [],
           })),
+        
+          settings: {
+            ...current.settings,
+            nextOrderSequence: settings?.next_order_sequence ?? 1,
+            workshopName: settings?.workshop_name ?? "5G CELL COMUNICACIONES",
+            workshopShortName: settings?.workshop_short_name ?? "5G CELL",
+            phone: settings?.phone ?? "",
+            address: settings?.address ?? "",
+          },
         }));
       
       } catch (err) {
@@ -433,6 +451,12 @@ return { client };
       console.error(error);
       return { error: error.message };
     }
+    await supabase
+  .from("settings")
+  .update({
+    next_order_sequence: sequence + 1,
+  })
+  .eq("user_id", user.id);
     
   
     setData((current) => ({
