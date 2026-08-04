@@ -433,33 +433,7 @@ return { client };
       console.error(error);
       return { error: error.message };
     }
-    if (user) {
-      supabase
-        .from("orders")
-        .insert({
-          id: order.id,
-          user_id: user.id,
-          client_id: order.clientId,
-          order_number: order.orderNumber,
-          device: order.device,
-          reported_problem: order.reportedProblem,
-          diagnosis: order.diagnosis,
-          work_performed: order.workPerformed,
-          parts_used: order.partsUsed,
-          technician: order.technician,
-          status: order.status,
-          estimated_total: order.estimatedTotal,
-          received_at: order.receivedAt,
-          updated_at: order.updatedAt,
-          delivered_at: order.deliveredAt,
-          payments: order.payments,
-          notes: order.notes,
-          movements: order.movements,
-        })
-        .then(({ error }) => {
-          if (error) console.error(error);
-        });
-    }
+    
   
     setData((current) => ({
       ...current,
