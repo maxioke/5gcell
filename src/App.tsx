@@ -197,22 +197,39 @@ if (!user) {
           {view === 'dashboard' && <DashboardPage orders={data.orders} clients={data.clients} onOpenOrder={openOrder} onNewOrder={() => navigate('new-order')} onChangeStatus={(id, status) => { workshop.changeStatus(id, status); notify('Estado de la orden actualizado.') }} />}
           {view === 'orders' && <OrdersPage orders={data.orders} clients={data.clients} onOpenOrder={openOrder} onNewOrder={() => navigate('new-order')} onChangeStatus={(id, status) => { workshop.changeStatus(id, status); notify('Estado actualizado correctamente.') }} />}
           {view === 'clients' && <ClientsPage clients={data.clients} orders={data.orders} onNewClient={() => setClientForm({ mode: 'new' })} onOpenClient={openClient} />}
-          {view === 'new-order' && <NewOrderPage clients={data.clients} onBack={() => navigate('orders')} onCreate={(input) => {
-            const result = workshop.createOrder(input)
+          {view === 'new-order' && <NewOrderPage clients={data.clients} onBack={() => navigate('orders')} 
+          onCreate={async (input) => {
+            const result = await workshop.createOrder(input)
+          
             if (result.error) return result.error
+          
             if (result.order) {
               setActiveOrderId(result.order.id)
-              setView('orders')
+              setView("orders")
               notify(`${result.order.orderNumber} fue creada correctamente.`)
             }
+          
             return undefined
           }} />}
         </div>
       </main>
 
       {activeOrder && <OrderDetailDialog key={activeOrder.id} order={activeOrder} client={getClient(data.clients, activeOrder.clientId)} onClose={() => setActiveOrderId(null)} onChangeStatus={(status) => { workshop.changeStatus(activeOrder.id, status); notify('Estado de la orden actualizado.') }} onUpdate={(changes) => { workshop.updateOrder(activeOrder.id, changes); notify('Detalles técnicos guardados.') }} onAddPayment={(amount, method) => { workshop.addPayment(activeOrder.id, amount, method); notify('Pago registrado correctamente.') }} onAddNote={(text) => { workshop.addNote(activeOrder.id, text); notify('Nota interna agregada.') }} onShowReceipt={() => setReceiptOrderId(activeOrder.id)} />}
-      {activeClient && <ClientDetailDialog client={activeClient} orders={data.orders.filter((order) => order.clientId === activeClient.id)} onClose={() => setActiveClientId(null)} onEdit={() => { setActiveClientId(null); setClientForm({ mode: 'edit', client: activeClient }) }} onDelete={() => { const result = workshop.removeClient(activeClient.id); if (result.error) notify(result.error, 'error'); else { setActiveClientId(null); notify('Cliente eliminado.') } }} onOpenOrder={openOrder} />}
-      {clientForm && <ClientFormDialog key={clientForm.client?.id ?? 'new-client'} client={clientForm.client} onClose={() => setClientForm(null)} onSave={(form) => clientForm.mode === 'new' ? workshop.createClient(form) : workshop.updateClient(clientForm.client!.id, form)} onSaved={() => { setClientForm(null); notify(clientForm.mode === 'new' ? 'Cliente creado correctamente.' : 'Cliente actualizado correctamente.') }} />}
+      {activeClient && <ClientDetailDialog client={activeClient} orders={data.orders.filter((order) => order.clientId === activeClient.id)} onClose={() => setActiveClientId(null)} onEdit={() => { setActiveClientId(null); setClientForm({ mode: 'edit', client: activeClient }) }} onDelete={async () => {
+  const result = await workshop.removeClient(activeClient.id);
+
+  if (result.error) {
+    notify(result.error, "error");
+  } else {
+    setActiveClientId(null);
+    notify("Cliente eliminado.");
+  }
+}} onOpenOrder={openOrder} />}
+      {clientForm && <ClientFormDialog key={clientForm.client?.id ?? 'new-client'} client={clientForm.client} onClose={() => setClientForm(null)} onSave={async (form) => {
+  return clientForm.mode === "new"
+    ? await workshop.createClient(form)
+    : await workshop.updateClient(clientForm.client!.id, form)
+}} onSaved={() => { setClientForm(null); notify(clientForm.mode === 'new' ? 'Cliente creado correctamente.' : 'Cliente actualizado correctamente.') }} />}
       {receiptOrder && <ReceiptDialog order={receiptOrder} client={getClient(data.clients, receiptOrder.clientId)} settings={data.settings} onClose={() => setReceiptOrderId(null)} />}
       {toast && <div className={`toast toast--${toast.tone}`} role="status">{toast.tone === 'success' ? <CheckCircle2 size={18} /> : <CircleAlert size={18} />}<span>{toast.message}</span><button type="button" aria-label="Cerrar mensaje" onClick={() => setToast(null)}><X size={16} /></button></div>}
     </div>
@@ -325,7 +342,7 @@ function OrdersTable({ orders, clients, onOpenOrder, onChangeStatus, compact = f
   </tbody></table></div>
 }
 
-function NewOrderPage({ clients, onBack, onCreate }: { clients: Client[]; onBack: () => void; onCreate: (input: NewOrderInput) => string | undefined }) {
+function NewOrderPage({ clients, onBack, onCreate }: { clients: Client[]; onBack: () => void; onCreate: (input: NewOrderInput) => Promise<string | undefined> }) {
   const [draft, setDraft] = useState<OrderDraft>(defaultDraft)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -341,7 +358,7 @@ function NewOrderPage({ clients, onBack, onCreate }: { clients: Client[]; onBack
     patch('accessories', draft.accessories.includes(accessory) ? draft.accessories.filter((item) => item !== accessory) : [...draft.accessories, accessory])
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
     if (draft.customerMode === 'existing' && !draft.selectedClientId) return setError('Selecciona el cliente al que pertenece el equipo.')
@@ -351,7 +368,7 @@ function NewOrderPage({ clients, onBack, onCreate }: { clients: Client[]; onBack
     if (total < 0 || deposit < 0 || deposit > total) return setError('Revisa los valores: el abono no puede superar el valor total.')
     setSaving(true)
     const device: Device = { brand: draft.brand.trim(), model: draft.model.trim(), color: draft.color.trim(), imei: draft.imei.trim(), serialNumber: draft.serialNumber.trim(), accessCode: draft.accessCode.trim(), accessories: draft.accessories }
-    const message = onCreate({
+    const message = await onCreate({
       clientId: draft.customerMode === 'existing' ? draft.selectedClientId : undefined,
       client: draft.customerMode === 'new' ? { fullName: draft.fullName, document: draft.document, phone: draft.phone, address: draft.address, observations: draft.observations } : undefined,
       device, reportedProblem: draft.reportedProblem, diagnosis: draft.diagnosis, workPerformed: draft.workPerformed, partsUsed: draft.partsUsed, technician: draft.technician, status: draft.status, estimatedTotal: total, initialPayment: deposit, paymentMethod: draft.paymentMethod,
@@ -398,10 +415,10 @@ function ClientsPage({ clients, orders, onNewClient, onOpenClient }: { clients: 
   </>
 }
 
-function ClientFormDialog({ client, onClose, onSave, onSaved }: { client?: Client; onClose: () => void; onSave: (form: NewClientInput) => { error?: string }; onSaved: () => void }) {
+function ClientFormDialog({ client, onClose, onSave, onSaved }: { client?: Client; onClose: () => void; onSave: (form: NewClientInput) => Promise<{ error?: string }>; onSaved: () => void }) {
   const [form, setForm] = useState<NewClientInput>(() => ({ fullName: client?.fullName ?? '', document: client?.document ?? '', phone: client?.phone ?? '', address: client?.address ?? '', observations: client?.observations ?? '' }))
   const [error, setError] = useState('')
-  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!form.fullName.trim() || !form.document.trim() || !form.phone.trim()) { setError('Nombre, documento y teléfono son obligatorios.'); return } const result = onSave(form); if (result.error) setError(result.error); else onSaved() }
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!form.fullName.trim() || !form.document.trim() || !form.phone.trim()) { setError('Nombre, documento y teléfono son obligatorios.'); return } const result = await onSave(form); if (result.error) setError(result.error); else onSaved() }
   return <Dialog title={client ? 'Editar cliente' : 'Nuevo cliente'} onClose={onClose}><form className="dialog-form" onSubmit={submit}><p className="dialog-intro">{client ? 'Actualiza la información de contacto y las observaciones internas.' : 'Crea una ficha de cliente para usarla en tus órdenes de reparación.'}</p><Field label="Nombre completo" required value={form.fullName} onChange={(value) => setForm((state) => ({ ...state, fullName: value }))} placeholder="Nombre y apellidos" /><Field label="Número de documento" required value={form.document} onChange={(value) => setForm((state) => ({ ...state, document: value }))} placeholder="Cédula o documento" /><Field label="Teléfono" required value={form.phone} onChange={(value) => setForm((state) => ({ ...state, phone: value }))} placeholder="300 000 0000" /><Field label="Dirección" value={form.address ?? ''} onChange={(value) => setForm((state) => ({ ...state, address: value }))} placeholder="Opcional" /><label className="field"><span>Observaciones</span><textarea value={form.observations ?? ''} onChange={(event) => setForm((state) => ({ ...state, observations: event.target.value }))} placeholder="Notas sobre el cliente (opcional)" rows={3} /></label>{error && <p className="form-error"><CircleAlert size={16} />{error}</p>}<div className="dialog-actions"><button className="button button--ghost" type="button" onClick={onClose}>Cancelar</button><button className="button button--primary" type="submit"><Save size={17} />{client ? 'Guardar cambios' : 'Crear cliente'}</button></div></form></Dialog>
 }
 
