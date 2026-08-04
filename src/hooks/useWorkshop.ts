@@ -4,7 +4,7 @@ import { id, normalizeDocument } from '../lib/formatters'
 import type { Client, NewClientInput, NewOrderInput, PaymentMethod, RepairOrder, RepairStatus, WorkshopData } from '../types'
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
-const STORAGE_KEY = '5gcell-workshop-data-v1'
+
 
 function loadData(): WorkshopData {
   return {
@@ -12,8 +12,12 @@ function loadData(): WorkshopData {
     orders: [],
     settings: {
       nextOrderSequence: 1,
+      workshopName: "5G CELL COMUNICACIONES",
+      workshopShortName: "5G CELL",
+      phone: "",
+      address: "",
     },
-  } as WorkshopData
+  };
 }
 
 function now() {
