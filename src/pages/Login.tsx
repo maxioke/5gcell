@@ -630,7 +630,7 @@ export default function Login() {
                     <span>
                       {isRegister
                         ? "¿Ya tienes una cuenta registrada? Inicia sesión"
-                        : "¿Aún no tienes cuenta? Registrar taller"}
+                        : "¿Aún no tienes cuenta? Registrate"}
                     </span>
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-slate-950 transition-all duration-300">
                       <ArrowRight className="h-3.5 w-3.5" />
