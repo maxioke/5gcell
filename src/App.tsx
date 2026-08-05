@@ -59,20 +59,24 @@ const navigation: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
 const defaultDraft: OrderDraft = {
   customerMode: 'existing', selectedClientId: '', fullName: '', document: '', phone: '', address: '', observations: '',
   brand: '', model: '', color: '', imei: '', serialNumber: '', accessCode: '', accessories: [],
-  reportedProblem: '', diagnosis: '', workPerformed: '', partsUsed: '', technician: 'ALEX R.', status: 'Recibido',
+  reportedProblem: '', diagnosis: '', workPerformed: '', partsUsed: '', technician: '', status: 'Recibido',
   estimatedTotal: '', initialPayment: '', paymentMethod: 'Efectivo',
 }
 
 function App() {
   const { user, loading } = useAuth();
 
-if (loading) {
-  return <div>Cargando...</div>;
-}
+  if (loading) {
+    return <div>Cargando...</div>;
+  }
 
-if (!user) {
-  return <Login />;
-}
+  if (!user) {
+    return <Login />;
+  }
+
+  // Obtener el nombre del usuario dinámicamente
+  const userName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario';
+  const userInitials = initials(userName);
 
   const workshop = useWorkshop()
   const { data } = workshop
@@ -131,6 +135,7 @@ if (!user) {
     setView(next)
     setSidebarOpen(false)
   }
+
   async function handleLogout() {
     await supabase.auth.signOut();
   }
@@ -140,30 +145,28 @@ if (!user) {
       {sidebarOpen && <button className="mobile-scrim" aria-label="Cerrar navegación" type="button" onClick={() => setSidebarOpen(false)} />}
       <aside className={`sidebar ${sidebarOpen ? 'sidebar--open' : ''}`}>
         <div className="sidebar__top">
-  <Brand />
+          <Brand />
 
-  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-    <button
-      type="button"
-      className="button button--ghost"
-      onClick={handleLogout}
-    >
-      Cerrar sesión
-    </button>
-    
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={handleLogout}
+            >
+              Cerrar sesión
+            </button>
+            
+            <button
+              className="sidebar__close icon-button"
+              aria-label="Cerrar menú"
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X size={19} />
+            </button>
+          </div>
+        </div>
 
-    <button
-      className="sidebar__close icon-button"
-      aria-label="Cerrar menú"
-      type="button"
-      onClick={() => setSidebarOpen(false)}
-    >
-      <X size={19} />
-    </button>
-  </div>
-</div>
-
-          
         <div className="workspace-chip"><span className="workspace-chip__pulse" />Taller principal</div>
         <nav className="sidebar__nav" aria-label="Navegación principal">
           <p className="nav-label">Operación</p>
@@ -181,8 +184,10 @@ if (!user) {
             <span className="support-card__icon"><ShieldCheck size={17} /></span>
             <div><strong>Datos protegidos</strong><span>Guardado local activo</span></div>
           </div>
-          <button className="profile-control" type="button" onClick={() => notify('Sesión local de administrador activa.')}>
-            <span className="avatar avatar--small">MR</span><span><strong>ALEX L</strong><small>Administrador</small></span><MoreHorizontal size={18} />
+          <button className="profile-control" type="button" onClick={() => notify(`Sesión activa: ${userName}`)}>
+            <span className="avatar avatar--small">{userInitials}</span>
+            <span><strong>{userName}</strong><small>Administrador</small></span>
+            <MoreHorizontal size={18} />
           </button>
         </div>
       </aside>
@@ -214,12 +219,12 @@ if (!user) {
           <div className="topbar__actions">
             <button className="icon-button" aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'} type="button" onClick={() => setDarkMode((value) => !value)}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
             <button className="icon-button notification-button" aria-label="Notificaciones" type="button" onClick={() => notify('No tienes notificaciones nuevas.')}><Bell size={18} /><span /></button>
-            <span className="avatar topbar-avatar">MR</span>
+            <span className="avatar topbar-avatar">{userInitials}</span>
           </div>
         </header>
 
         <div className="page-container">
-          {view === 'dashboard' && <DashboardPage orders={data.orders} clients={data.clients} onOpenOrder={openOrder} onNewOrder={() => navigate('new-order')} onChangeStatus={(id, status) => { workshop.changeStatus(id, status); notify('Estado de la orden actualizado.') }} />}
+          {view === 'dashboard' && <DashboardPage userName={userName} orders={data.orders} clients={data.clients} onOpenOrder={openOrder} onNewOrder={() => navigate('new-order')} onChangeStatus={(id, status) => { workshop.changeStatus(id, status); notify('Estado de la orden actualizado.') }} />}
           {view === 'orders' && <OrdersPage orders={data.orders} clients={data.clients} onOpenOrder={openOrder} onNewOrder={() => navigate('new-order')} onChangeStatus={(id, status) => { workshop.changeStatus(id, status); notify('Estado actualizado correctamente.') }} />}
           {view === 'clients' && <ClientsPage clients={data.clients} orders={data.orders} onNewClient={() => setClientForm({ mode: 'new' })} onOpenClient={openClient} />}
           {view === 'new-order' && <NewOrderPage clients={data.clients} onBack={() => navigate('orders')} 
@@ -265,7 +270,7 @@ function PageHeading({ eyebrow, title, description, action }: { eyebrow: string;
   return <div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="page-heading__description">{description}</p></div>{action}</div>
 }
 
-function DashboardPage({ orders, clients, onOpenOrder, onNewOrder, onChangeStatus }: { orders: RepairOrder[]; clients: Client[]; onOpenOrder: (id: string) => void; onNewOrder: () => void; onChangeStatus: (id: string, status: RepairStatus) => void }) {
+function DashboardPage({ userName, orders, clients, onOpenOrder, onNewOrder, onChangeStatus }: { userName: string; orders: RepairOrder[]; clients: Client[]; onOpenOrder: (id: string) => void; onNewOrder: () => void; onChangeStatus: (id: string, status: RepairStatus) => void }) {
   const stats = useMemo(() => {
     const today = new Date().toDateString()
     const active = orders.filter((order) => !['Entregado', 'Cancelado'].includes(order.status))
@@ -284,7 +289,7 @@ function DashboardPage({ orders, clients, onOpenOrder, onNewOrder, onChangeStatu
   const stateDistribution = repairStatuses.filter((status) => status !== 'Cancelado').map((status) => ({ status, count: orders.filter((order) => order.status === status).length })).filter((entry) => entry.count > 0)
 
   return <>
-    <PageHeading eyebrow="Operación · hoy" title="Buen día, ALEX" description="Este es el pulso de tu taller en tiempo real." action={<button className="button button--primary" type="button" onClick={onNewOrder}><Plus size={18} />Nueva orden</button>} />
+    <PageHeading eyebrow="Operación · hoy" title={`Buen día, ${userName}`} description="Este es el pulso de tu taller en tiempo real." action={<button className="button button--primary" type="button" onClick={onNewOrder}><Plus size={18} />Nueva orden</button>} />
     <section className="metric-grid metric-grid--top">
       <MetricCard icon={<ClipboardList size={19} />} iconTone="blue" label="Equipos ingresados hoy" value={String(stats.today).padStart(2, '0')} help="Órdenes recibidas" />
       <MetricCard icon={<ClockBadge />} iconTone="amber" label="Equipos pendientes" value={String(stats.pending).padStart(2, '0')} help="Requieren seguimiento" />
