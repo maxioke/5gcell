@@ -18,6 +18,7 @@ import {
 } from './lib/formatters'
 import type { Client, Device, NewClientInput, NewOrderInput, PaymentMethod, RepairOrder, RepairStatus, WorkshopData } from './types'
 import './App.css'
+import { supabase } from "./lib/supabase";
 
 type View = 'dashboard' | 'orders' | 'clients' | 'new-order'
 type Toast = { message: string; tone: 'success' | 'error' } | null
@@ -130,15 +131,39 @@ if (!user) {
     setView(next)
     setSidebarOpen(false)
   }
+  async function handleLogout() {
+    await supabase.auth.signOut();
+  }
 
   return (
     <div className="app-shell">
       {sidebarOpen && <button className="mobile-scrim" aria-label="Cerrar navegación" type="button" onClick={() => setSidebarOpen(false)} />}
       <aside className={`sidebar ${sidebarOpen ? 'sidebar--open' : ''}`}>
         <div className="sidebar__top">
-          <Brand />
-          <button className="sidebar__close icon-button" aria-label="Cerrar menú" type="button" onClick={() => setSidebarOpen(false)}><X size={19} /></button>
-        </div>
+  <Brand />
+
+  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+    <button
+      type="button"
+      className="button button--ghost"
+      onClick={handleLogout}
+    >
+      Cerrar sesión
+    </button>
+    
+
+    <button
+      className="sidebar__close icon-button"
+      aria-label="Cerrar menú"
+      type="button"
+      onClick={() => setSidebarOpen(false)}
+    >
+      <X size={19} />
+    </button>
+  </div>
+</div>
+
+          
         <div className="workspace-chip"><span className="workspace-chip__pulse" />Taller principal</div>
         <nav className="sidebar__nav" aria-label="Navegación principal">
           <p className="nav-label">Operación</p>
