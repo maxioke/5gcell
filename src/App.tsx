@@ -6,7 +6,7 @@ import {
   ClipboardList, CreditCard, Download, History, LayoutDashboard, MapPin,
   Menu, MessageSquareText, Moon, MoreHorizontal, NotebookPen, PackageSearch, Phone,
   Plus, Printer, ReceiptText, RefreshCcw, Save, Search, Settings2, ShieldCheck,
-  Smartphone, Sun, Trash2, UserRoundPlus, Users, WalletCards, Wrench, X,
+  Smartphone, Sun, Trash2, UserRoundPlus, Users, WalletCards, Wrench, X, Lock, Grid3X3
 } from 'lucide-react'
 import { Brand } from './components/Brand'
 import { PaymentBadge, StatusBadge } from './components/Badges'
@@ -63,6 +63,79 @@ const defaultDraft: OrderDraft = {
   estimatedTotal: '', initialPayment: '', paymentMethod: 'Efectivo',
 }
 
+/* ==========================================================================
+   COMPONENTE: Selector de Patrón Gráfico (Grilla 3x3)
+   ========================================================================== */
+function PatternSelector({ value, onChange }: { value: string; onChange: (pattern: string) => void }) {
+  const [sequence, setSequence] = useState<number[]>(() => {
+    if (!value) return []
+    const clean = value.replace('Patrón: ', '')
+    return clean.split(' → ').map(Number).filter(Boolean)
+  })
+
+  const handlePointClick = (point: number) => {
+    let newSeq: number[]
+    if (sequence.includes(point)) {
+      newSeq = sequence.filter((p) => p !== point)
+    } else {
+      newSeq = [...sequence, point]
+    }
+    setSequence(newSeq)
+    onChange(newSeq.length > 0 ? `Patrón: ${newSeq.join(' → ')}` : '')
+  }
+
+  const handleReset = () => {
+    setSequence([])
+    onChange('')
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4 w-full col-span-full">
+      <div className="flex items-center justify-between w-full text-xs">
+        <span className="font-semibold text-slate-400">
+          Secuencia: <span className="text-cyan-400 font-bold">{sequence.join(' → ') || 'Toca los puntos'}</span>
+        </span>
+        {sequence.length > 0 && (
+          <button
+            type="button"
+            onClick={handleReset}
+            className="text-[11px] text-red-400 hover:underline cursor-pointer"
+          >
+            Limpiar
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 p-3 bg-slate-900/80 rounded-xl border border-cyan-500/20">
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((point) => {
+          const isSelected = sequence.includes(point)
+          const orderNum = sequence.indexOf(point) + 1
+
+          return (
+            <button
+              key={point}
+              type="button"
+              onClick={() => handlePointClick(point)}
+              className={`relative flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 cursor-pointer ${
+                isSelected
+                  ? 'bg-cyan-500 text-slate-950 font-black shadow-[0_0_12px_rgba(6,182,212,0.8)] scale-105'
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <div className={`h-2.5 w-2.5 rounded-full ${isSelected ? 'bg-slate-950' : 'bg-slate-500'}`} />
+              {isSelected && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[9px] font-bold text-slate-950 shadow">
+                  {orderNum}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const { user, loading } = useAuth();
 
@@ -74,7 +147,6 @@ function App() {
     return <Login />;
   }
 
-  // Obtener el nombre del usuario dinámicamente
   const userName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario';
   const userInitials = initials(userName);
 
@@ -374,6 +446,7 @@ function OrdersTable({ orders, clients, onOpenOrder, onChangeStatus, compact = f
 
 function NewOrderPage({ clients, onBack, onCreate }: { clients: Client[]; onBack: () => void; onCreate: (input: NewOrderInput) => Promise<string | undefined> }) {
   const [draft, setDraft] = useState<OrderDraft>(defaultDraft)
+  const [lockMode, setLockMode] = useState<'pin' | 'pattern'>('pin')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const total = Number(draft.estimatedTotal) || 0
@@ -416,7 +489,49 @@ function NewOrderPage({ clients, onBack, onCreate }: { clients: Client[]; onBack
           {draft.customerMode === 'existing' ? <label className="field field--full"><span>Buscar cliente <b>*</b></span><select value={draft.selectedClientId} onChange={(event) => patch('selectedClientId', event.target.value)}><option value="">Selecciona un cliente...</option>{clients.map((client) => <option value={client.id} key={client.id}>{client.fullName} · {client.document}</option>)}</select></label> : <div className="form-grid form-grid--three"><Field label="Nombre completo" required value={draft.fullName} onChange={(value) => patch('fullName', value)} placeholder="Ej. Daniela Ruiz" /><Field label="Documento" required value={draft.document} onChange={(value) => patch('document', value)} placeholder="Número de cédula" /><Field label="Teléfono" required value={draft.phone} onChange={(value) => patch('phone', value)} placeholder="300 000 0000" /><Field label="Dirección" value={draft.address} onChange={(value) => patch('address', value)} placeholder="Opcional" /><Field label="Observaciones del cliente" value={draft.observations} onChange={(value) => patch('observations', value)} placeholder="Opcional" className="field--span-2" /></div>}
         </section>
         <section className="form-card"><div className="form-card__heading"><span className="form-step">02</span><div><h2>Equipo</h2><p>Registra los datos que ayudan a identificarlo con precisión.</p></div></div>
-          <div className="form-grid form-grid--three"><Field label="Marca" required value={draft.brand} onChange={(value) => patch('brand', value)} placeholder="Ej. Samsung" /><Field label="Modelo" required value={draft.model} onChange={(value) => patch('model', value)} placeholder="Ej. Galaxy A54" /><Field label="Color" value={draft.color} onChange={(value) => patch('color', value)} placeholder="Opcional" /><Field label="IMEI" value={draft.imei} onChange={(value) => patch('imei', value)} placeholder="Opcional" /><Field label="Número de serie" value={draft.serialNumber} onChange={(value) => patch('serialNumber', value)} placeholder="Opcional" /><Field label="Contraseña o patrón" value={draft.accessCode} onChange={(value) => patch('accessCode', value)} placeholder="Opcional" type="password" /></div>
+          <div className="form-grid form-grid--three">
+            <Field label="Marca" required value={draft.brand} onChange={(value) => patch('brand', value)} placeholder="Ej. Samsung" />
+            <Field label="Modelo" required value={draft.model} onChange={(value) => patch('model', value)} placeholder="Ej. Galaxy A54" />
+            <Field label="Color" value={draft.color} onChange={(value) => patch('color', value)} placeholder="Opcional" />
+            <Field label="IMEI" value={draft.imei} onChange={(value) => patch('imei', value)} placeholder="Opcional" />
+            <Field label="Número de serie" value={draft.serialNumber} onChange={(value) => patch('serialNumber', value)} placeholder="Opcional" />
+            
+            {/* Campo Dinámico de Seguridad: PIN / Clave o Patrón Gráfico */}
+            <div className="field col-span-full">
+              <span className="mb-1 block">Seguridad del equipo</span>
+              <div className="segmented-control mb-3">
+                <button
+                  type="button"
+                  className={lockMode === 'pin' ? 'segmented-control__active' : ''}
+                  onClick={() => { setLockMode('pin'); patch('accessCode', '') }}
+                >
+                  <Lock size={15} /> PIN / Clave
+                </button>
+                <button
+                  type="button"
+                  className={lockMode === 'pattern' ? 'segmented-control__active' : ''}
+                  onClick={() => { setLockMode('pattern'); patch('accessCode', '') }}
+                >
+                  <Grid3X3 size={15} /> Patrón Gráfico
+                </button>
+              </div>
+
+              {lockMode === 'pin' ? (
+                <input
+                  type="text"
+                  value={draft.accessCode}
+                  onChange={(e) => patch('accessCode', e.target.value)}
+                  placeholder="Ej: 1234 o Contraseña"
+                />
+              ) : (
+                <PatternSelector
+                  value={draft.accessCode}
+                  onChange={(val) => patch('accessCode', val)}
+                />
+              )}
+            </div>
+          </div>
+
           <fieldset className="accessory-field"><legend>Accesorios recibidos</legend><div className="accessory-options">{accessories.map((accessory) => <label className={draft.accessories.includes(accessory) ? 'accessory-option accessory-option--selected' : 'accessory-option'} key={accessory}><input type="checkbox" checked={draft.accessories.includes(accessory)} onChange={() => toggleAccessory(accessory)} /><span>{accessory}</span></label>)}</div></fieldset>
         </section>
         <section className="form-card"><div className="form-card__heading"><span className="form-step">03</span><div><h2>Servicio y presupuesto</h2><p>Define el estado inicial y la información técnica disponible.</p></div></div>
@@ -472,7 +587,7 @@ function OrderDetailDialog({ order, client, onClose, onChangeStatus, onUpdate, o
   function saveNote(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!note.trim()) return; onAddNote(note); setNote('') }
 
   return <Dialog title={order.orderNumber} onClose={onClose} wide className="order-dialog"><div className="order-detail-header"><div><div className="order-detail-header__subtitle"><StatusBadge status={order.status} /><span>Recibida {formatDate(order.receivedAt)}</span></div><h3>{order.device.brand} {order.device.model}</h3><p>{client?.fullName ?? 'Cliente no disponible'} · {client?.phone ?? 'Sin teléfono'}</p></div><div className="order-detail-header__actions"><button className="button button--ghost" type="button" onClick={onShowReceipt}><ReceiptText size={17} />Comprobante</button><label className="order-status-control"><span>Estado</span><select value={order.status} onChange={(event) => onChangeStatus(event.target.value as RepairStatus)}>{repairStatuses.map((status) => <option key={status}>{status}</option>)}</select></label></div></div><div className="detail-tabs" role="tablist"><button type="button" role="tab" aria-selected={tab === 'summary'} className={tab === 'summary' ? 'detail-tab detail-tab--active' : 'detail-tab'} onClick={() => setTab('summary')}>Resumen</button><button type="button" role="tab" aria-selected={tab === 'payments'} className={tab === 'payments' ? 'detail-tab detail-tab--active' : 'detail-tab'} onClick={() => setTab('payments')}>Pagos <span>{order.payments.length}</span></button><button type="button" role="tab" aria-selected={tab === 'notes'} className={tab === 'notes' ? 'detail-tab detail-tab--active' : 'detail-tab'} onClick={() => setTab('notes')}>Notas <span>{order.notes.length}</span></button><button type="button" role="tab" aria-selected={tab === 'history'} className={tab === 'history' ? 'detail-tab detail-tab--active' : 'detail-tab'} onClick={() => setTab('history')}>Historial</button></div>
-    {tab === 'summary' && <div className="order-detail-content"><div className="order-detail-grid"><section><div className="detail-block"><div className="detail-block__heading"><h4>Información del equipo</h4><Smartphone size={18} /></div><dl className="info-list"><div><dt>Marca y modelo</dt><dd>{order.device.brand} {order.device.model}</dd></div><div><dt>Color</dt><dd>{order.device.color || 'No registrado'}</dd></div><div><dt>IMEI</dt><dd>{order.device.imei || 'No registrado'}</dd></div><div><dt>Accesorios</dt><dd>{order.device.accessories.length ? order.device.accessories.join(', ') : 'Sin accesorios'}</dd></div></dl></div><div className="detail-block"><div className="detail-block__heading"><h4>Información de servicio</h4><button className="text-button" type="button" onClick={() => setEditing((value) => !value)}>{editing ? 'Cancelar' : 'Editar'} {editing ? <X size={15} /> : <Settings2 size={15} />}</button></div>{editing ? <div className="technical-edit"><label className="field"><span>Problema reportado</span><textarea value={editForm.reportedProblem} onChange={(event) => setEditForm((state) => ({ ...state, reportedProblem: event.target.value }))} rows={2} /></label><label className="field"><span>Diagnóstico técnico</span><textarea value={editForm.diagnosis} onChange={(event) => setEditForm((state) => ({ ...state, diagnosis: event.target.value }))} rows={2} /></label><label className="field"><span>Trabajo realizado</span><textarea value={editForm.workPerformed} onChange={(event) => setEditForm((state) => ({ ...state, workPerformed: event.target.value }))} rows={2} /></label><label className="field"><span>Repuestos utilizados</span><textarea value={editForm.partsUsed} onChange={(event) => setEditForm((state) => ({ ...state, partsUsed: event.target.value }))} rows={2} /></label><div className="form-grid form-grid--two"><Field label="Técnico" value={editForm.technician} onChange={(value) => setEditForm((state) => ({ ...state, technician: value }))} placeholder="Técnico" /><Field label="Valor total" value={editForm.estimatedTotal} onChange={(value) => setEditForm((state) => ({ ...state, estimatedTotal: value.replace(/[^0-9]/g, '') }))} placeholder="0" inputMode="numeric" /></div><button className="button button--primary" type="button" onClick={saveDetails}><Save size={16} />Guardar detalles</button></div> : <div className="service-detail"><div><span>Problema reportado</span><p>{order.reportedProblem}</p></div><div><span>Diagnóstico</span><p>{order.diagnosis || 'Aún no registrado'}</p></div><div><span>Trabajo realizado</span><p>{order.workPerformed || 'Aún no registrado'}</p></div><div><span>Repuestos</span><p>{order.partsUsed || 'Aún no registrado'}</p></div><div className="service-detail__bottom"><span>Técnico: <strong>{order.technician || 'Sin asignar'}</strong></span><span>Última edición: <strong>{formatDateTime(order.updatedAt)}</strong></span></div></div>}</div></section><aside><div className="detail-block financial-summary"><div className="detail-block__heading"><h4>Estado del pago</h4><WalletCards size={18} /></div><PaymentBadge order={order} /><div className="financial-summary__values"><div><span>Valor total</span><strong>{formatCurrency(order.estimatedTotal)}</strong></div><div><span>Abonos</span><strong className="text-green">{formatCurrency(getPaid(order))}</strong></div><div><span>Saldo pendiente</span><strong className={balance > 0 ? 'text-rose' : 'text-green'}>{formatCurrency(balance)}</strong></div></div><button className="button button--soft button--wide" type="button" onClick={() => setTab('payments')}><CreditCard size={17} />Registrar pago</button></div><div className="detail-block client-mini-card"><div className="detail-block__heading"><h4>Cliente</h4><Users size={17} /></div><span className="avatar">{client ? initials(client.fullName) : '--'}</span><div><strong>{client?.fullName || 'No disponible'}</strong><span>{client?.document || 'Sin documento'}</span><span>{client?.phone || 'Sin teléfono'}</span></div></div></aside></div></div>}
+    {tab === 'summary' && <div className="order-detail-content"><div className="order-detail-grid"><section><div className="detail-block"><div className="detail-block__heading"><h4>Información del equipo</h4><Smartphone size={18} /></div><dl className="info-list"><div><dt>Marca y modelo</dt><dd>{order.device.brand} {order.device.model}</dd></div><div><dt>Color</dt><dd>{order.device.color || 'No registrado'}</dd></div><div><dt>IMEI</dt><dd>{order.device.imei || 'No registrado'}</dd></div><div><dt>Código / Patrón</dt><dd className="font-semibold text-cyan-400">{order.device.accessCode || 'No registrado'}</dd></div><div><dt>Accesorios</dt><dd>{order.device.accessories.length ? order.device.accessories.join(', ') : 'Sin accesorios'}</dd></div></dl></div><div className="detail-block"><div className="detail-block__heading"><h4>Información de servicio</h4><button className="text-button" type="button" onClick={() => setEditing((value) => !value)}>{editing ? 'Cancelar' : 'Editar'} {editing ? <X size={15} /> : <Settings2 size={15} />}</button></div>{editing ? <div className="technical-edit"><label className="field"><span>Problema reportado</span><textarea value={editForm.reportedProblem} onChange={(event) => setEditForm((state) => ({ ...state, reportedProblem: event.target.value }))} rows={2} /></label><label className="field"><span>Diagnóstico técnico</span><textarea value={editForm.diagnosis} onChange={(event) => setEditForm((state) => ({ ...state, diagnosis: event.target.value }))} rows={2} /></label><label className="field"><span>Trabajo realizado</span><textarea value={editForm.workPerformed} onChange={(event) => setEditForm((state) => ({ ...state, workPerformed: event.target.value }))} rows={2} /></label><label className="field"><span>Repuestos utilizados</span><textarea value={editForm.partsUsed} onChange={(event) => setEditForm((state) => ({ ...state, partsUsed: event.target.value }))} rows={2} /></label><div className="form-grid form-grid--two"><Field label="Técnico" value={editForm.technician} onChange={(value) => setEditForm((state) => ({ ...state, technician: value }))} placeholder="Técnico" /><Field label="Valor total" value={editForm.estimatedTotal} onChange={(value) => setEditForm((state) => ({ ...state, estimatedTotal: value.replace(/[^0-9]/g, '') }))} placeholder="0" inputMode="numeric" /></div><button className="button button--primary" type="button" onClick={saveDetails}><Save size={16} />Guardar detalles</button></div> : <div className="service-detail"><div><span>Problema reportado</span><p>{order.reportedProblem}</p></div><div><span>Diagnóstico</span><p>{order.diagnosis || 'Aún no registrado'}</p></div><div><span>Trabajo realizado</span><p>{order.workPerformed || 'Aún no registrado'}</p></div><div><span>Repuestos</span><p>{order.partsUsed || 'Aún no registrado'}</p></div><div className="service-detail__bottom"><span>Técnico: <strong>{order.technician || 'Sin asignar'}</strong></span><span>Última edición: <strong>{formatDateTime(order.updatedAt)}</strong></span></div></div>}</div></section><aside><div className="detail-block financial-summary"><div className="detail-block__heading"><h4>Estado del pago</h4><WalletCards size={18} /></div><PaymentBadge order={order} /><div className="financial-summary__values"><div><span>Valor total</span><strong>{formatCurrency(order.estimatedTotal)}</strong></div><div><span>Abonos</span><strong className="text-green">{formatCurrency(getPaid(order))}</strong></div><div><span>Saldo pendiente</span><strong className={balance > 0 ? 'text-rose' : 'text-green'}>{formatCurrency(balance)}</strong></div></div><button className="button button--soft button--wide" type="button" onClick={() => setTab('payments')}><CreditCard size={17} />Registrar pago</button></div><div className="detail-block client-mini-card"><div className="detail-block__heading"><h4>Cliente</h4><Users size={17} /></div><span className="avatar">{client ? initials(client.fullName) : '--'}</span><div><strong>{client?.fullName || 'No disponible'}</strong><span>{client?.document || 'Sin documento'}</span><span>{client?.phone || 'Sin teléfono'}</span></div></div></aside></div></div>}
     {tab === 'payments' && <div className="order-detail-content payment-tab"><div className="payment-tab__summary"><PaymentBadge order={order} /><h4>{balance === 0 ? 'La orden está completamente pagada' : `Faltan ${formatCurrency(balance)} por cobrar`}</h4><p>Registra cada abono para mantener el saldo actualizado automáticamente.</p></div>{balance > 0 && <form className="add-payment-form" onSubmit={savePayment}><Field label="Valor del pago" value={payment} onChange={setPayment} placeholder="0" inputMode="numeric" /><label className="field"><span>Método</span><select value={method} onChange={(event) => setMethod(event.target.value as PaymentMethod)}>{(['Efectivo', 'Transferencia', 'Tarjeta', 'Otro'] as PaymentMethod[]).map((item) => <option key={item}>{item}</option>)}</select></label><button className="button button--primary" type="submit"><Plus size={17} />Agregar abono</button></form>}{error && <p className="form-error"><CircleAlert size={16} />{error}</p>}<div className="payment-history"><h4>Historial de pagos</h4>{order.payments.length ? order.payments.slice().reverse().map((item) => <div className="payment-history__row" key={item.id}><span className="payment-history__icon"><CreditCard size={16} /></span><span><strong>{formatCurrency(item.amount)}</strong><small>{item.method} · {formatDateTime(item.createdAt)}</small></span><CheckCircle2 size={18} className="text-green" /></div>) : <EmptyState title="Aún no hay pagos" detail="Registra un abono cuando recibas el primer pago." icon={<WalletCards size={22} />} />}</div></div>}
     {tab === 'notes' && <div className="order-detail-content notes-tab"><div className="private-note-label"><ShieldCheck size={17} /><span><strong>Notas privadas</strong>Solo son visibles para el equipo del taller.</span></div><form className="note-form" onSubmit={saveNote}><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Agrega una nota interna sobre esta reparación..." rows={3} /><button className="button button--primary" type="submit" disabled={!note.trim()}><MessageSquareText size={17} />Guardar nota</button></form><div className="notes-list">{order.notes.length ? order.notes.map((item) => <article className="note-item" key={item.id}><span className="note-item__icon"><NotebookPen size={16} /></span><div><p>{item.text}</p><small>{formatDateTime(item.createdAt)} · Recepción</small></div></article>) : <EmptyState title="No hay notas internas" detail="Las notas del equipo aparecerán en este espacio privado." icon={<NotebookPen size={22} />} />}</div></div>}
     {tab === 'history' && <div className="order-detail-content history-tab"><div className="history-intro"><History size={19} /><div><h4>Historial de movimientos</h4><p>Cada acción relevante queda registrada con fecha y hora.</p></div></div><div className="timeline">{order.movements.map((movement, index) => <div className="timeline-item" key={movement.id}><span className={index === 0 ? 'timeline-item__dot timeline-item__dot--current' : 'timeline-item__dot'} /><div><strong>{movement.description}</strong><small>{formatDateTime(movement.createdAt)} · {movement.actor}</small></div></div>)}</div><div className="order-dates"><span><CalendarDays size={15} />Ingreso: {formatDateTime(order.receivedAt)}</span><span><RefreshCcw size={15} />Modificación: {formatDateTime(order.updatedAt)}</span>{order.deliveredAt && <span><CheckCircle2 size={15} />Entrega: {formatDateTime(order.deliveredAt)}</span>}</div></div>}
@@ -483,7 +598,7 @@ function ReceiptDialog({ order, client, settings, onClose }: { order: RepairOrde
   const balance = getBalance(order)
   function printReceipt() { window.print() }
   console.log(settings);
-  return <Dialog title="Comprobante de recepción" onClose={onClose} wide className="receipt-dialog" backdropClassName="receipt-backdrop"><div className="receipt-actions no-print"><button className="button button--ghost" type="button" onClick={printReceipt}><Printer size={17} />Imprimir</button><button className="button button--primary" type="button" onClick={printReceipt}><Download size={17} />Guardar PDF</button></div><article className="receipt-print"><header className="receipt-print__header"><div><Brand /><p>{settings.address} · {settings.phone}</p></div><div className="receipt-order"><span>ORDEN DE SERVICIO</span><strong>{order.orderNumber}</strong><small>Fecha: {formatDate(order.receivedAt)}</small></div></header><div className="receipt-print__rule" /><section className="receipt-grid"><div><h4>Datos del cliente</h4><p><strong>{client?.fullName || 'No disponible'}</strong></p><p>Documento: {client?.document || '—'}</p><p>Teléfono: {client?.phone || '—'}</p><p>Dirección: {client?.address || '—'}</p></div><div><h4>Equipo recibido</h4><p><strong>{order.device.brand} {order.device.model}</strong>{order.device.color ? ` · ${order.device.color}` : ''}</p><p>IMEI: {order.device.imei || 'No registrado'}</p><p>Serie: {order.device.serialNumber || 'No registrado'}</p><p>Accesorios: {order.device.accessories.length ? order.device.accessories.join(', ') : 'Ninguno'}</p></div></section><section className="receipt-problem"><h4>Problema reportado</h4><p>{order.reportedProblem}</p></section><section className="receipt-financial"><div><span>Valor estimado</span><strong>{formatCurrency(order.estimatedTotal)}</strong></div><div><span>Abono realizado</span><strong>{formatCurrency(getPaid(order))}</strong></div><div><span>Saldo pendiente</span><strong>{formatCurrency(balance)}</strong></div><div><span>Estado</span><StatusBadge status={order.status} /></div></section><section className="receipt-terms"><h4>Condiciones de recepción</h4><p>El taller no se hace responsable por información o accesorios no registrados en este comprobante. El diagnóstico puede modificar el valor inicialmente estimado previa autorización del cliente.</p></section><footer className="receipt-signatures"><div><span>Firma del cliente</span></div><div><span>Firma del técnico</span></div></footer></article><p className="receipt-help no-print"><CircleAlert size={15} />Para descargar el PDF, elige “Guardar como PDF” en la ventana de impresión del navegador.</p></Dialog>
+  return <Dialog title="Comprobante de recepción" onClose={onClose} wide className="receipt-dialog" backdropClassName="receipt-backdrop"><div className="receipt-actions no-print"><button className="button button--ghost" type="button" onClick={printReceipt}><Printer size={17} />Imprimir</button><button className="button button--primary" type="button" onClick={printReceipt}><Download size={17} />Guardar PDF</button></div><article className="receipt-print"><header className="receipt-print__header"><div><Brand /><p>{settings.address} · {settings.phone}</p></div><div className="receipt-order"><span>ORDEN DE SERVICIO</span><strong>{order.orderNumber}</strong><small>Fecha: {formatDate(order.receivedAt)}</small></div></header><div className="receipt-print__rule" /><section className="receipt-grid"><div><h4>Datos del cliente</h4><p><strong>{client?.fullName || 'No disponible'}</strong></p><p>Documento: {client?.document || '—'}</p><p>Teléfono: {client?.phone || '—'}</p><p>Dirección: {client?.address || '—'}</p></div><div><h4>Equipo recibido</h4><p><strong>{order.device.brand} {order.device.model}</strong>{order.device.color ? ` · ${order.device.color}` : ''}</p><p>IMEI: {order.device.imei || 'No registrado'}</p><p>Serie: {order.device.serialNumber || 'No registrado'}</p><p>Clave / Patrón: {order.device.accessCode || 'No registrado'}</p><p>Accesorios: {order.device.accessories.length ? order.device.accessories.join(', ') : 'Ninguno'}</p></div></section><section className="receipt-problem"><h4>Problema reportado</h4><p>{order.reportedProblem}</p></section><section className="receipt-financial"><div><span>Valor estimado</span><strong>{formatCurrency(order.estimatedTotal)}</strong></div><div><span>Abono realizado</span><strong>{formatCurrency(getPaid(order))}</strong></div><div><span>Saldo pendiente</span><strong>{formatCurrency(balance)}</strong></div><div><span>Estado</span><StatusBadge status={order.status} /></div></section><section className="receipt-terms"><h4>Condiciones de recepción</h4><p>El taller no se hace responsable por información o accesorios no registrados en este comprobante. El diagnóstico puede modificar el valor inicialmente estimado previa autorización del cliente.</p></section><footer className="receipt-signatures"><div><span>Firma del cliente</span></div><div><span>Firma del técnico</span></div></footer></article><p className="receipt-help no-print"><CircleAlert size={15} />Para descargar el PDF, elige “Guardar como PDF” en la ventana de impresión del navegador.</p></Dialog>
 }
 
 function EmptyState({ title, detail, icon }: { title: string; detail: string; icon: React.ReactNode }) {
