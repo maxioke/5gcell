@@ -316,10 +316,9 @@ export default function Login() {
                   {/* LOGO BRANDING */}
                   <div className="flex items-center gap-4">
                     <div className="relative group">
-                      <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 blur opacity-70 group-hover:opacity-100 transition duration-300" />
-                      <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/20 bg-slate-950/80 shadow-2xl backdrop-blur-xl">
-                        <Smartphone className="h-7 w-7 text-cyan-400" />
-                      </div>
+                      <div className="absolute -inset-1 rounded-2x3 bg-gradient-to-r from-cyan-500 to-blue-600 blur opacity-70 group-hover:opacity-100 transition duration-300" />
+                      <div className="relative flex h-30 w-40 items-center justify-center rounded-2xl border border-white/20 bg-slate-950/80 shadow-2xl backdrop-blur-xl p-1">
+                      <img src="/logo.png" alt="Logo Taller" className="h-40 w-40 object-contain scale-200" /></div>
                     </div>
                     <div>
                       <h1 className="text-2xl font-black tracking-widest text-white">

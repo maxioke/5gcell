@@ -28,9 +28,6 @@ export function useWorkshop() {
   const { user } = useAuth();
   const [data, setData] = useState<WorkshopData>(() => loadData())
 
-  //useEffect(() => {
-   // window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
- // }, [data])
   useEffect(() => {
     if (!user) return;
   
@@ -50,14 +47,14 @@ export function useWorkshop() {
   
         if (ordersError) throw ordersError;
         const { data: settings, error: settingsError } = await supabase
-  .from("settings")
-  .select("*")
-  .eq("user_id", user.id)
-  .single();
+          .from("settings")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
 
-if (settingsError && settingsError.code !== "PGRST116") {
-  throw settingsError;
-}
+        if (settingsError && settingsError.code !== "PGRST116") {
+          throw settingsError;
+        }
         console.log("CLIENTES CARGADOS:", clients);
   
         setData((current) => ({
@@ -146,36 +143,37 @@ if (settingsError && settingsError.code !== "PGRST116") {
     };
   
     const { error } = await supabase
-  .from("clients")
-  .insert({
-    id: client.id,
-    user_id: user.id,
-    full_name: client.fullName,
-    document: client.document,
-    phone: client.phone,
-    address: client.address,
-    observations: client.observations,
-    created_at: client.createdAt,
-    updated_at: client.updatedAt,
-  });
-  const { data: verify } = await supabase
-  .from("clients")
-  .select("*")
-  .eq("id", client.id);
+      .from("clients")
+      .insert({
+        id: client.id,
+        user_id: user.id,
+        full_name: client.fullName,
+        document: client.document,
+        phone: client.phone,
+        address: client.address,
+        observations: client.observations,
+        created_at: client.createdAt,
+        updated_at: client.updatedAt,
+      });
 
-console.log("CLIENTE GUARDADO:", verify);
+    const { data: verify } = await supabase
+      .from("clients")
+      .select("*")
+      .eq("id", client.id);
 
-if (error) {
-  console.error(error);
-  return { error: error.message };
-}
+    console.log("CLIENTE GUARDADO:", verify);
 
-setData((current) => ({
-  ...current,
-  clients: [client, ...current.clients],
-}));
+    if (error) {
+      console.error(error);
+      return { error: error.message };
+    }
 
-return { client };
+    setData((current) => ({
+      ...current,
+      clients: [client, ...current.clients],
+    }));
+
+    return { client };
   }
 
   async function updateClient(
@@ -255,6 +253,7 @@ return { client };
   
     return {};
   }
+
   async function removeClient(
     clientId: string
   ): Promise<{ error?: string }> {
@@ -455,12 +454,13 @@ return { client };
       console.error(error);
       return { error: error.message };
     }
+
     await supabase
-  .from("settings")
-  .update({
-    next_order_sequence: sequence + 1,
-  })
-  .eq("user_id", user.id);
+      .from("settings")
+      .update({
+        next_order_sequence: sequence + 1,
+      })
+      .eq("user_id", user.id);
     
   
     setData((current) => ({
@@ -475,7 +475,40 @@ return { client };
           current.settings.nextOrderSequence + 1,
       },
     }));
-  
+
+    // =========================================================
+    // ENVÍO AUTOMÁTICO DE COMPROBANTE POR WHATSAPP (MICROSERVICIO)
+    // =========================================================
+    try {
+      // 1. Obtener los datos del cliente para tomar su teléfono
+      const targetClient = newClient || data.clients.find((c) => c.id === clientId);
+      
+      if (targetClient && targetClient.phone) {
+        // 2. Obtener URL pública del PDF desde Supabase Storage (Ajusta la ruta de tu bucket si aplica)
+        const { data: publicUrlData } = supabase
+          .storage
+          .from('comprobantes') // Cambia 'comprobantes' por el nombre exacto de tu Bucket en Supabase
+          .getPublicUrl(`ordenes/${order.orderNumber}.pdf`);
+
+        const pdfUrl = publicUrlData?.publicUrl || "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+
+        // 3. Disparar petición POST a Render de fondo
+        fetch('https://ws-bot-uvt1.onrender.com/send-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: targetClient.phone,
+            pdfUrl: pdfUrl,
+            orderNumber: order.orderNumber,
+          }),
+        }).then(res => res.json())
+          .then(resData => console.log('✅ Notificación WhatsApp:', resData))
+          .catch(err => console.error('❌ Error enviando WhatsApp:', err));
+      }
+    } catch (wsError) {
+      console.error("Error al preparar envío de WhatsApp:", wsError);
+    }
+
     return { order };
   }
 
@@ -594,143 +627,143 @@ return { client };
     const timestamp = now()
     const currentOrder = data.orders.find((o) => o.id === orderId);
 
-if (currentOrder && user) {
-  const payment = {
-    id: id(),
-    amount,
-    method,
-    createdAt: timestamp,
-  };
+    if (currentOrder && user) {
+      const payment = {
+        id: id(),
+        amount,
+        method,
+        createdAt: timestamp,
+      };
 
-  const movement = {
-    id: id(),
-    description: `Se registró un pago de ${new Intl.NumberFormat("es-CO", {
-      style: "currency",
-      currency: "COP",
-      maximumFractionDigits: 0,
-    }).format(amount)}`,
-    createdAt: timestamp,
-    actor: "Recepción",
-  };
+      const movement = {
+        id: id(),
+        description: `Se registró un pago de ${new Intl.NumberFormat("es-CO", {
+          style: "currency",
+          currency: "COP",
+          maximumFractionDigits: 0,
+        }).format(amount)}`,
+        createdAt: timestamp,
+        actor: "Recepción",
+      };
 
-  const updatedPayments = [...currentOrder.payments, payment];
-  const updatedMovements = [movement, ...currentOrder.movements];
+      const updatedPayments = [...currentOrder.payments, payment];
+      const updatedMovements = [movement, ...currentOrder.movements];
 
-  supabase
-    .from("orders")
-    .update({
-      payments: updatedPayments,
-      movements: updatedMovements,
-      updated_at: timestamp,
-    })
-    .eq("id", orderId)
-    .eq("user_id", user.id)
-    .then(({ error }) => {
-      if (error) console.error(error);
-    });
-}
+      supabase
+        .from("orders")
+        .update({
+          payments: updatedPayments,
+          movements: updatedMovements,
+          updated_at: timestamp,
+        })
+        .eq("id", orderId)
+        .eq("user_id", user.id)
+        .then(({ error }) => {
+          if (error) console.error(error);
+        });
+    }
 
-setData((current) => ({
-  ...current,
-  orders: current.orders.map((order) =>
-    order.id === orderId
-      ? {
-          ...order,
-          updatedAt: timestamp,
-          payments: [
-            ...order.payments,
-            {
-              id: id(),
-              amount,
-              method,
-              createdAt: timestamp,
-            },
-          ],
-          movements: [
-            {
-              id: id(),
-              description: `Se registró un pago de ${new Intl.NumberFormat(
-                "es-CO",
+    setData((current) => ({
+      ...current,
+      orders: current.orders.map((order) =>
+        order.id === orderId
+          ? {
+              ...order,
+              updatedAt: timestamp,
+              payments: [
+                ...order.payments,
                 {
-                  style: "currency",
-                  currency: "COP",
-                  maximumFractionDigits: 0,
-                }
-              ).format(amount)}`,
-              createdAt: timestamp,
-              actor: "Recepción",
-            },
-            ...order.movements,
-          ],
-        }
-      : order
-  ),
-}));
+                  id: id(),
+                  amount,
+                  method,
+                  createdAt: timestamp,
+                },
+              ],
+              movements: [
+                {
+                  id: id(),
+                  description: `Se registró un pago de ${new Intl.NumberFormat(
+                    "es-CO",
+                    {
+                      style: "currency",
+                      currency: "COP",
+                      maximumFractionDigits: 0,
+                    }
+                  ).format(amount)}`,
+                  createdAt: timestamp,
+                  actor: "Recepción",
+                },
+                ...order.movements,
+              ],
+            }
+          : order
+      ),
+    }));
   }
 
   function addNote(orderId: string, text: string) {
     const timestamp = now()
     const currentOrder = data.orders.find((o) => o.id === orderId);
 
-if (currentOrder && user) {
-  const note = {
-    id: id(),
-    text: text.trim(),
-    createdAt: timestamp,
-  };
+    if (currentOrder && user) {
+      const note = {
+        id: id(),
+        text: text.trim(),
+        createdAt: timestamp,
+      };
 
-  const movement = {
-    id: id(),
-    description: "Se agregó una nota interna",
-    createdAt: timestamp,
-    actor: "Recepción",
-  };
+      const movement = {
+        id: id(),
+        description: "Se agregó una nota interna",
+        createdAt: timestamp,
+        actor: "Recepción",
+      };
 
-  const updatedNotes = [note, ...currentOrder.notes];
-  const updatedMovements = [movement, ...currentOrder.movements];
+      const updatedNotes = [note, ...currentOrder.notes];
+      const updatedMovements = [movement, ...currentOrder.movements];
 
-  supabase
-    .from("orders")
-    .update({
-      notes: updatedNotes,
-      movements: updatedMovements,
-      updated_at: timestamp,
-    })
-    .eq("id", orderId)
-    .eq("user_id", user.id)
-    .then(({ error }) => {
-      if (error) console.error(error);
-    });
-}
+      supabase
+        .from("orders")
+        .update({
+          notes: updatedNotes,
+          movements: updatedMovements,
+          updated_at: timestamp,
+        })
+        .eq("id", orderId)
+        .eq("user_id", user.id)
+        .then(({ error }) => {
+          if (error) console.error(error);
+        });
+    }
 
-setData((current) => ({
-  ...current,
-  orders: current.orders.map((order) =>
-    order.id === orderId
-      ? {
-          ...order,
-          updatedAt: timestamp,
-          notes: [
-            {
-              id: id(),
-              text: text.trim(),
-              createdAt: timestamp,
-            },
-            ...order.notes,
-          ],
-          movements: [
-            {
-              id: id(),
-              description: "Se agregó una nota interna",
-              createdAt: timestamp,
-              actor: "Recepción",
-            },
-            ...order.movements,
-          ],
-        }
-      : order
-  ),
-}));
+    setData((current) => ({
+      ...current,
+      orders: current.orders.map((order) =>
+        order.id === orderId
+          ? {
+              ...order,
+              updatedAt: timestamp,
+              notes: [
+                {
+                  id: id(),
+                  text: text.trim(),
+                  createdAt: timestamp,
+                },
+                ...order.notes,
+              ],
+              movements: [
+                {
+                  id: id(),
+                  description: "Se agregó una nota interna",
+                  createdAt: timestamp,
+                  actor: "Recepción",
+                },
+                ...order.movements,
+              ],
+            }
+          : order
+      ),
+    }));
   }
 
   function resetDemo() {
