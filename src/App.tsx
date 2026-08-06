@@ -1,3 +1,4 @@
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import { useAuth } from "./contexts/AuthContext";
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
@@ -19,6 +20,7 @@ import {
 import type { Client, Device, NewClientInput, NewOrderInput, PaymentMethod, RepairOrder, RepairStatus, WorkshopData } from './types'
 import './App.css'
 import { supabase } from "./lib/supabase";
+
 
 type View = 'dashboard' | 'orders' | 'clients' | 'new-order'
 type Toast = { message: string; tone: 'success' | 'error' } | null

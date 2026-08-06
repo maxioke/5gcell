@@ -196,18 +196,19 @@ export default function Login() {
     setMessageType("");
     setLoading(true);
 
-    // Enviar datos en options.data para activar Triggers de base de datos
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: ownerName,
-          business_name: businessName,
-          phone: phone,
-        },
+  // Enviar datos en options.data para activar Triggers de base de datos
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${window.location.origin}/confirm-success`,
+      data: {
+        full_name: ownerName,
+        business_name: businessName,
+        phone: phone,
       },
-    });
+    },
+  });
 
     if (error) {
       setLoading(false);
