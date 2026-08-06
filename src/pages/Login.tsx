@@ -142,16 +142,23 @@ export default function Login() {
     setMessageType("");
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    setLoading(false);
-
-    if (error) {
-      setMessage(error.message);
+      if (error) throw error;
+    } catch (err: any) {
+      let rawError = err?.message || err?.error_description || "";
+      if (typeof rawError === "object") rawError = JSON.stringify(rawError);
+      if (!rawError || rawError === "{}" || rawError === "[object Object]") {
+        rawError = "Credenciales inválidas o error de conexión.";
+      }
+      setMessage(rawError);
       setMessageType("error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -196,49 +203,55 @@ export default function Login() {
     setMessageType("");
     setLoading(true);
 
-  // Enviar datos en options.data para activar Triggers de base de datos
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${window.location.origin}/confirm-success`,
-      data: {
-        full_name: ownerName,
-        business_name: businessName,
-        phone: phone,
-      },
-    },
-  });
+    try {
+      // 1. Enviar datos a Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/confirm-success`,
+          data: {
+            full_name: ownerName,
+            business_name: businessName,
+            phone: phone,
+          },
+        },
+      });
 
-    if (error) {
-      setLoading(false);
-      setMessage(error.message);
-      setMessageType("error");
-      return;
-    }
+      if (error) throw error;
 
-    // Insert explícito en la tabla profiles para alinearse a la tabla de base de datos
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert({
-          id: data.user.id,
-          business_name: businessName,
-          full_name: ownerName,
-          phone: phone,
-        });
+      // 2. Insert explícito en la tabla profiles
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .upsert({
+            id: data.user.id,
+            business_name: businessName,
+            full_name: ownerName,
+            phone: phone,
+          });
 
-      if (profileError) {
-        setLoading(false);
-        setMessage(profileError.message);
-        setMessageType("error");
-        return;
+        if (profileError) throw profileError;
       }
-    }
 
-    setLoading(false);
-    setMessage("Cuenta creada correctamente.");
-    setMessageType("success");
+      setMessage("Cuenta creada correctamente. Por favor revisa tu correo.");
+      setMessageType("success");
+    } catch (err: any) {
+      let rawError = err?.message || err?.error_description || "";
+
+      if (typeof rawError === "object") {
+        rawError = JSON.stringify(rawError);
+      }
+
+      if (!rawError || rawError === "{}" || rawError === "[object Object]") {
+        rawError = "Error en permisos de Supabase (RLS) o el usuario ya existe.";
+      }
+
+      setMessage(rawError);
+      setMessageType("error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleResetPassword() {
@@ -250,20 +263,23 @@ export default function Login() {
 
     setResetLoading(true);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
-    });
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
 
-    setResetLoading(false);
+      if (error) throw error;
 
-    if (error) {
-      setMessage(error.message);
+      setMessage("Te enviamos un correo para restablecer tu contraseña.");
+      setMessageType("success");
+    } catch (err: any) {
+      let rawError = err?.message || "Error al enviar el correo de recuperación.";
+      if (typeof rawError === "object") rawError = JSON.stringify(rawError);
+      setMessage(rawError);
       setMessageType("error");
-      return;
+    } finally {
+      setResetLoading(false);
     }
-
-    setMessage("Te enviamos un correo para restablecer tu contraseña.");
-    setMessageType("success");
   }
 
   // Estilo reutilizable para los inputs
@@ -319,7 +335,8 @@ export default function Login() {
                     <div className="relative group">
                       <div className="absolute -inset-1 rounded-2x3 bg-gradient-to-r from-cyan-500 to-blue-600 blur opacity-70 group-hover:opacity-100 transition duration-300" />
                       <div className="relative flex h-30 w-40 items-center justify-center rounded-2xl border border-white/20 bg-slate-950/80 shadow-2xl backdrop-blur-xl p-1">
-                      <img src="/logo.png" alt="Logo Taller" className="h-40 w-40 object-contain scale-200" /></div>
+                        <img src="/logo.png" alt="Logo Taller" className="h-40 w-40 object-contain scale-200" />
+                      </div>
                     </div>
                     <div>
                       <h1 className="text-2xl font-black tracking-widest text-white">
@@ -347,7 +364,6 @@ export default function Login() {
                       para 5GCELL
                     </span>
                     <br />
-                    
                   </h2>
 
                   <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-300">
@@ -458,7 +474,9 @@ export default function Login() {
                     ) : (
                       <div className="h-2.5 w-2.5 rounded-full bg-red-400 animate-ping shrink-0" />
                     )}
-                    <span>{message}</span>
+                    <span>
+                      {typeof message === "object" ? JSON.stringify(message) : String(message)}
+                    </span>
                   </div>
                 )}
 
